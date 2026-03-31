@@ -1,6 +1,152 @@
-// index.ts
-import { readFileSync, existsSync } from "fs";
-import { join } from "path";
+// src/parser.ts
+function hasLiterateFrontmatter(content) {
+  const match = content.match(/^---\n([\s\S]*?)\n---/);
+  if (!match) return false;
+  const frontmatter = match[1];
+  return /^\s*literate\s*:\s*true/m.test(frontmatter);
+}
+function parseLiterateMarkdown(content) {
+  let body = content;
+  if (body.startsWith("---")) {
+    const endIndex = body.indexOf("\n---", 3);
+    if (endIndex !== -1) {
+      body = body.slice(endIndex + 4);
+    }
+  }
+  const sections = body.split(/\n---\n/);
+  const steps = [];
+  for (const section of sections) {
+    const trimmed = section.trim();
+    if (!trimmed) continue;
+    const step = parseStep(trimmed);
+    if (step) {
+      steps.push(step);
+    }
+  }
+  return steps;
+}
+function parseStep(section) {
+  const configMatch = section.match(/```yaml\s*\{config\}\n([\s\S]*?)```/);
+  let config = { step: `step-${Date.now()}` };
+  let remaining = section;
+  if (configMatch) {
+    const configText = configMatch[1];
+    config = parseNestedYaml(configText);
+    remaining = section.replace(configMatch[0], "").trim();
+  }
+  const codeBlocks = [];
+  const blockRegex = /(```\w+\s*\{[^}]*\}\n[\s\S]*?```)/g;
+  let match;
+  while ((match = blockRegex.exec(remaining)) !== null) {
+    const languageMatch = match[0].match(/^```(\w+)/);
+    const metaMatch = match[0].match(/\{([^}]*)\}/);
+    const codeMatch = match[0].match(/```\w+\s*\{[^}]*\}\n([\s\S]*?)```/);
+    if (languageMatch && metaMatch && codeMatch) {
+      codeBlocks.push({
+        language: languageMatch[1],
+        meta: metaMatch[1].split(/\s+/).filter((m) => m),
+        code: codeMatch[1],
+        fullBlock: match[0]
+      });
+    }
+  }
+  const prompt = remaining.replace(/```yaml\s*\{config\}\n[\s\S]*?```/g, "").trim();
+  if (!prompt && codeBlocks.length === 0) {
+    return null;
+  }
+  return { config, prompt, codeBlocks };
+}
+function parseSimpleYaml(text) {
+  const result = {};
+  const lines = text.split("\n");
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const match = trimmed.match(/^(\w+)\s*:\s*(.*)$/);
+    if (match) {
+      const [, key, value] = match;
+      if (value.startsWith("[") && value.endsWith("]")) {
+        result[key] = value.slice(1, -1).split(",").map((s) => s.trim());
+      } else if (value.startsWith('"') && value.endsWith('"')) {
+        result[key] = value.slice(1, -1);
+      } else if (value.startsWith("'") && value.endsWith("'")) {
+        result[key] = value.slice(1, -1);
+      } else if (value === "true") {
+        result[key] = true;
+      } else if (value === "false") {
+        result[key] = false;
+      } else if (value === "" || value === "~" || value === "null") {
+        result[key] = null;
+      } else if (!isNaN(Number(value)) && value.trim() !== "") {
+        result[key] = Number(value);
+      } else {
+        result[key] = value.trim();
+      }
+    }
+  }
+  return result;
+}
+function parseNestedYaml(text) {
+  const result = {};
+  const lines = text.split("\n");
+  let currentKey = null;
+  let currentNested = null;
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const topMatch = trimmed.match(/^(\w+)\s*:\s*(.*)$/);
+    if (topMatch && !line.startsWith(" ") && !line.startsWith("	")) {
+      currentKey = topMatch[1];
+      const value = topMatch[2];
+      if (value === "" || value === "~") {
+        result[currentKey] = {};
+        currentNested = result[currentKey];
+      } else {
+        result[currentKey] = parseValue(value);
+        currentNested = null;
+      }
+    } else if (currentNested !== null) {
+      const nestedMatch = trimmed.match(/^(.+?)\s*:\s*(.*)$/);
+      if (nestedMatch) {
+        const nestedKey = nestedMatch[1];
+        const nestedValue = nestedMatch[2];
+        currentNested[nestedKey] = parseValue(nestedValue);
+      }
+    }
+  }
+  return result;
+}
+function parseCodeBlocks(section) {
+  const blocks = [];
+  const regex = /```(\w+)\s*\{([^}]+)\}\n([\s\S]*?)```/g;
+  let match;
+  while ((match = regex.exec(section)) !== null) {
+    const language = match[1];
+    const metaString = match[2];
+    const code = match[3].trim();
+    const meta = metaString.split(/\s+/).filter((m) => m);
+    blocks.push({ language, meta, code });
+  }
+  return blocks;
+}
+function parseValue(value) {
+  if (value.startsWith("[") && value.endsWith("]")) {
+    return value.slice(1, -1).split(",").map((s) => s.trim());
+  } else if (value.startsWith('"') && value.endsWith('"')) {
+    return value.slice(1, -1);
+  } else if (value.startsWith("'") && value.endsWith("'")) {
+    return value.slice(1, -1);
+  } else if (value === "true") {
+    return true;
+  } else if (value === "false") {
+    return false;
+  } else if (value === "" || value === "~" || value === "null") {
+    return null;
+  } else if (!isNaN(Number(value)) && value.trim() !== "") {
+    return Number(value);
+  }
+  return value.trim();
+}
 
 // src/interpolation.ts
 function getNestedValue(obj, path) {
@@ -129,6 +275,63 @@ ${block.code}
   return resultPrompt;
 }
 
+// src/parse.ts
+function buildParseFormatInstruction(parseConfig) {
+  const keys = Object.keys(parseConfig).join(", ");
+  return `
+
+Format your response as JSON with the following keys: {${keys}}. DO NOT add anything before or after the JSON response, as it will be used for parsing.`;
+}
+function parseResponse(responseText, parseConfig) {
+  let jsonString = null;
+  const jsonBlockMatch = responseText.match(/```json\n([\s\S]*?)\n```/);
+  if (jsonBlockMatch) {
+    jsonString = jsonBlockMatch[1];
+  } else {
+    const trimmed = responseText.trim();
+    if (trimmed.startsWith("{")) {
+      jsonString = trimmed;
+    }
+  }
+  if (jsonString) {
+    try {
+      const parsed = JSON.parse(jsonString);
+      const result = {};
+      for (const [key, type] of Object.entries(parseConfig)) {
+        if (parsed[key] !== void 0) {
+          switch (type) {
+            case "bool":
+              result[key] = Boolean(parsed[key]);
+              break;
+            case "number":
+              result[key] = Number(parsed[key]);
+              break;
+            case "string":
+            default:
+              result[key] = String(parsed[key]);
+          }
+        }
+      }
+      return { success: true, data: result };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  }
+  return { success: false, error: "No valid JSON found in response" };
+}
+function processParse(step, responseText, metadata, client) {
+  if (!step.config.parse) {
+    return { success: true, data: metadata };
+  }
+  const result = parseResponse(responseText, step.config.parse);
+  if (result.success) {
+    Object.assign(metadata, result.data);
+    return { success: true, data: metadata };
+  } else {
+    return { success: false, error: result.error };
+  }
+}
+
 // src/routing.ts
 function evaluateCondition(condition, metadata) {
   try {
@@ -197,158 +400,12 @@ function resolveNextStep(next, steps, metadata) {
   return null;
 }
 
-// index.ts
+// src/plugin.ts
+import { readFileSync, existsSync } from "fs";
+import { join } from "path";
 var COMMANDS_DIR = ".opencode/commands";
 var sessionStates = /* @__PURE__ */ new Map();
 async function log(_client, _msg) {
-}
-function hasLiterateFrontmatter(content) {
-  const match = content.match(/^---\n([\s\S]*?)\n---/);
-  if (!match) return false;
-  const frontmatter = match[1];
-  return /^\s*literate\s*:\s*true/m.test(frontmatter);
-}
-function parseLiterateMarkdown(content) {
-  let body = content;
-  if (body.startsWith("---")) {
-    const endIndex = body.indexOf("\n---", 3);
-    if (endIndex !== -1) {
-      body = body.slice(endIndex + 4);
-    }
-  }
-  const sections = body.split(/\n---\n/);
-  const steps = [];
-  for (const section of sections) {
-    const trimmed = section.trim();
-    if (!trimmed) continue;
-    const step = parseStep(trimmed);
-    if (step) {
-      steps.push(step);
-    }
-  }
-  return steps;
-}
-function parseStep(section) {
-  const configMatch = section.match(/```yaml\s*\{config\}\n([\s\S]*?)```/);
-  let config = { step: `step-${Date.now()}` };
-  let remaining = section;
-  if (configMatch) {
-    const configText = configMatch[1];
-    config = parseNestedYaml(configText);
-    remaining = section.replace(configMatch[0], "").trim();
-  }
-  const codeBlocks = [];
-  const blockRegex = /(```\w+\s*\{[^}]*\}\n[\s\S]*?```)/g;
-  let match;
-  while ((match = blockRegex.exec(remaining)) !== null) {
-    const languageMatch = match[0].match(/^```(\w+)/);
-    const metaMatch = match[0].match(/\{([^}]*)\}/);
-    const codeMatch = match[0].match(/```\w+\s*\{[^}]*\}\n([\s\S]*?)```/);
-    if (languageMatch && metaMatch && codeMatch) {
-      codeBlocks.push({
-        language: languageMatch[1],
-        meta: metaMatch[1].split(/\s+/).filter((m) => m),
-        code: codeMatch[1],
-        fullBlock: match[0]
-      });
-    }
-  }
-  const prompt = remaining.replace(/```yaml\s*\{config\}\n[\s\S]*?```/g, "").trim();
-  if (!prompt && codeBlocks.length === 0) {
-    return null;
-  }
-  return { config, prompt, codeBlocks };
-}
-function parseSimpleYaml(text) {
-  const result = {};
-  const lines = text.split("\n");
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-    const match = trimmed.match(/^(\w+)\s*:\s*(.*)$/);
-    if (match) {
-      const [, key, value] = match;
-      if (value.startsWith("[") && value.endsWith("]")) {
-        result[key] = value.slice(1, -1).split(",").map((s) => s.trim());
-      } else if (value.startsWith('"') && value.endsWith('"')) {
-        result[key] = value.slice(1, -1);
-      } else if (value.startsWith("'") && value.endsWith("'")) {
-        result[key] = value.slice(1, -1);
-      } else if (value === "true") {
-        result[key] = true;
-      } else if (value === "false") {
-        result[key] = false;
-      } else if (value === "" || value === "~" || value === "null") {
-        result[key] = null;
-      } else if (!isNaN(Number(value)) && value.trim() !== "") {
-        result[key] = Number(value);
-      } else {
-        result[key] = value.trim();
-      }
-    }
-  }
-  return result;
-}
-function parseNestedYaml(text) {
-  const result = {};
-  const lines = text.split("\n");
-  let currentKey = null;
-  let currentNested = null;
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-    const topMatch = trimmed.match(/^(\w+)\s*:\s*(.*)$/);
-    if (topMatch && !line.startsWith(" ") && !line.startsWith("	")) {
-      currentKey = topMatch[1];
-      const value = topMatch[2];
-      if (value === "" || value === "~") {
-        result[currentKey] = {};
-        currentNested = result[currentKey];
-      } else {
-        result[currentKey] = parseValue(value);
-        currentNested = null;
-      }
-    } else if (currentNested !== null) {
-      const nestedMatch = trimmed.match(/^(.+?)\s*:\s*(.*)$/);
-      if (nestedMatch) {
-        const nestedKey = nestedMatch[1];
-        const nestedValue = nestedMatch[2];
-        currentNested[nestedKey] = parseValue(nestedValue);
-      }
-    }
-  }
-  return result;
-}
-function parseValue(value) {
-  if (value.startsWith("[") && value.endsWith("]")) {
-    return value.slice(1, -1).split(",").map((s) => s.trim());
-  } else if (value.startsWith('"') && value.endsWith('"')) {
-    return value.slice(1, -1);
-  } else if (value.startsWith("'") && value.endsWith("'")) {
-    return value.slice(1, -1);
-  } else if (value === "true") {
-    return true;
-  } else if (value === "false") {
-    return false;
-  } else if (value === "" || value === "~" || value === "null") {
-    return null;
-  } else if (!isNaN(Number(value)) && value.trim() !== "") {
-    return Number(value);
-  }
-  return value.trim();
-}
-function parseCodeBlocks(section) {
-  const blocks = [];
-  const regex = /```(\w+)\s*\{([^}]+)\}\n([\s\S]*?)```/g;
-  let match;
-  while ((match = regex.exec(section)) !== null) {
-    const language = match[1];
-    const metaString = match[2];
-    const code = match[3].trim();
-    const meta = metaString.split(/\s+/).filter((m) => m);
-    blocks.push({ language, meta, code });
-  }
-  return blocks;
 }
 async function getLatestAssistantResponse(client, sessionID) {
   try {
@@ -377,68 +434,11 @@ async function getLatestAssistantResponse(client, sessionID) {
     return null;
   }
 }
-function buildParseFormatInstruction(parseConfig) {
-  const keys = Object.keys(parseConfig).join(", ");
-  return `
-
-Format your response as JSON with the following keys: {${keys}}. DO NOT add anything before or after the JSON response, as it will be used for parsing.`;
-}
-function parseResponse(responseText, parseConfig) {
-  let jsonString = null;
-  const jsonBlockMatch = responseText.match(/```json\n([\s\S]*?)\n```/);
-  if (jsonBlockMatch) {
-    jsonString = jsonBlockMatch[1];
-  } else {
-    const trimmed = responseText.trim();
-    if (trimmed.startsWith("{")) {
-      jsonString = trimmed;
-    }
-  }
-  if (jsonString) {
-    try {
-      const parsed = JSON.parse(jsonString);
-      const result = {};
-      for (const [key, type] of Object.entries(parseConfig)) {
-        if (parsed[key] !== void 0) {
-          switch (type) {
-            case "bool":
-              result[key] = Boolean(parsed[key]);
-              break;
-            case "number":
-              result[key] = Number(parsed[key]);
-              break;
-            case "string":
-            default:
-              result[key] = String(parsed[key]);
-          }
-        }
-      }
-      return { success: true, data: result };
-    } catch (e) {
-      return { success: false, error: e.message };
-    }
-  }
-  return { success: false, error: "No valid JSON found in response" };
-}
-function processParse(step, responseText, metadata, client) {
-  if (!step.config.parse) {
-    return { success: true, data: metadata };
-  }
-  const result = parseResponse(responseText, step.config.parse);
-  if (result.success) {
-    log(client, `[literate-commands] Parsed variables: ${JSON.stringify(result.data)}`);
-    Object.assign(metadata, result.data);
-    return { success: true, data: metadata };
-  } else {
-    log(client, `[literate-commands] Parse failed: ${result.error}`);
-    return { success: false, error: result.error };
-  }
-}
 async function literateCommandsPlugin({ client, $ }) {
   await log(client, "[literate-commands] Plugin initialized");
   return {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    "command.execute.before": async (input, output) => {
+    "command.execute.before": async (input, outputObj) => {
       const { command, sessionID, arguments: args } = input;
       await log(client, `[literate-commands] Intercepting /${command}`);
       const commandPath = join(COMMANDS_DIR, `${command}.md`);
@@ -466,17 +466,14 @@ async function literateCommandsPlugin({ client, $ }) {
         sessionID,
         commandName: command,
         pendingParse: null,
-        // parse config waiting for response
         retries: 3,
-        // retry count (default 3)
         awaitingResponse: false,
-        // waiting for first response after prompt
         awaitingRetry: false
-        // waiting for retry response after retry prompt
       });
       await log(client, `[literate-commands] State set for session ${sessionID}`);
-      output.parts.length = 1;
-      output.parts[0] = {
+      const out = outputObj;
+      out.parts.length = 1;
+      out.parts[0] = {
         type: "text",
         text: `We are preparing to run the /${command} command.
 I will give you more instructions.
