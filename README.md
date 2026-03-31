@@ -34,7 +34,7 @@ Then add to your `opencode.json`:
 git clone https://github.com/apiad/opencode-literate-commands.git
 cd opencode-literate-commands
 npm install
-npm run build
+npm test
 ```
 
 Link locally:
@@ -212,8 +212,6 @@ echo '$name'  → echo 'Alice'
 See the `examples/` directory for sample commands:
 
 - [`greeting.md`](examples/greeting.md) - Simple 3-step greeting with routing
-- [`project-setup.md`](examples/project-setup.md) - Interactive project initialization
-- [`analyze-complexity.md`](examples/analyze-complexity.md) - Code analysis workflow
 
 ## Development
 
@@ -223,36 +221,16 @@ npm install
 
 # Run tests
 npm test
-
-# Build for production
-npm run build
-
-# Watch mode
-npm run dev
 ```
 
-### Project Structure
+## Project Structure
 
 ```
 opencode-literate-commands/
-├── src/
-│   ├── index.ts         # Main plugin export
-│   ├── types.ts         # TypeScript interfaces
-│   ├── parser.ts        # Markdown parsing
-│   ├── interpolation.ts # Variable substitution
-│   ├── executor.ts      # Script execution
-│   ├── routing.ts       # Step routing logic
-│   └── session.ts        # Session state management
-├── test/
-│   ├── parser.test.ts
-│   ├── interpolation.test.ts
-│   ├── routing.test.ts
-│   └── session.test.ts
+├── index.js           # Main plugin (ESM)
 ├── examples/
-│   ├── greeting.md
-│   ├── project-setup.md
-│   └── analyze-complexity.md
-└── dist/                # Build output
+│   └── greeting.md    # Example command
+└── README.md
 ```
 
 ## License
