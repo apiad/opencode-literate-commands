@@ -30,7 +30,18 @@ next:
   _: casual
 ```
 
-Routing...
+Routing... In the meantime check this beautiful function.
+
+```python
+def f(n):
+    return f(n-1) + f(n-2) if n > 2 else 1
+```
+
+```python {exec mode=store}
+# This code gets executed, the agent never sees it
+import json
+json.dumps(dict(name=str($name).upper()))
+```
 
 ---
 

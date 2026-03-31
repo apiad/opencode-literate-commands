@@ -38,7 +38,7 @@ async function log(client, msg) {
 }
 
 // Simple YAML check for literate: true
-function hasLiterateFrontmatter(content) {
+export function hasLiterateFrontmatter(content: string): boolean {
     const match = content.match(/^---\n([\s\S]*?)\n---/)
     if (!match) return false
     const frontmatter = match[1]
@@ -54,7 +54,7 @@ function hasLiterateFrontmatter(content) {
  * Parse command markdown into steps.
  * Each step is separated by --- (with optional whitespace).
  */
-function parseLiterateMarkdown(content) {
+export function parseLiterateMarkdown(content: string): any[] {
     // Remove frontmatter
     let body = content
     if (body.startsWith("---")) {
@@ -84,7 +84,7 @@ function parseLiterateMarkdown(content) {
 /**
  * Parse a single step section.
  */
-function parseStep(section) {
+export function parseStep(section: string): any {
     // Extract config block (```yaml {config}...```)
     const configMatch = section.match(/```yaml\s*\{config\}\n([\s\S]*?)```/)
     let config = { step: `step-${Date.now()}` }
@@ -129,7 +129,7 @@ function parseStep(section) {
  * Simple YAML parser for nested key-value pairs.
  * Handles: key: value, nested.key: value, key: "quoted value", key: [a, b, c]
  */
-function parseSimpleYaml(text) {
+export function parseSimpleYaml(text: string): any {
     const result = {}
     const lines = text.split("\n")
 
@@ -173,7 +173,7 @@ function parseSimpleYaml(text) {
  * Parse nested YAML config (handles parse:, question:, match: blocks).
  * Extracts top-level keys and nested content.
  */
-function parseNestedYaml(text) {
+export function parseNestedYaml(text: string): any {
     const result = {}
     const lines = text.split("\n")
     let currentKey = null
@@ -236,7 +236,7 @@ function parseValue(value) {
 /**
  * Extract code blocks with their metadata.
  */
-function parseCodeBlocks(section) {
+export function parseCodeBlocks(section: string): any[] {
     const blocks = []
     const regex = /```(\w+)\s*\{([^}]+)\}\n([\s\S]*?)```/g
     let match
@@ -262,7 +262,7 @@ function parseCodeBlocks(section) {
 /**
  * Get nested value from object using dot notation.
  */
-function getNestedValue(obj, path) {
+export function getNestedValue(obj: any, path: string): any {
     return path.split(".").reduce((o, k) => o?.[k], obj)
 }
 
@@ -312,7 +312,7 @@ async function getLatestAssistantResponse(client, sessionID) {
  * $arr.0 → first array element
  * $$ → full metadata as JSON string
  */
-function interpolate(text, metadata) {
+export function interpolate(text: string, metadata: any): string {
     return text.replace(/\$(\$|[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z0-9_]+)*)/g, (match, path) => {
         if (path === "$") {
             return JSON.stringify(metadata)
@@ -331,7 +331,7 @@ function interpolate(text, metadata) {
  *
  * This escapes values for shell safety.
  */
-function interpolateForShell(text, metadata) {
+export function interpolateForShell(text: string, metadata: any): string {
     return text.replace(/\$(\$|[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z0-9_]+)*)/g, (match, path) => {
         if (path === "$") {
             return JSON.stringify(metadata)
@@ -367,7 +367,7 @@ const DEFAULT_TIMEOUT = 30000
  * {exec=python3} → { interpreter: 'python3', mode: 'stdout' }
  * {exec mode=store} → { interpreter: based on language, mode: 'store' }
  */
-function parseExecMeta(meta, language) {
+export function parseExecMeta(meta: string[], language: string): { interpreter: string; mode: string } {
     // Default interpreter based on language
     let interpreter = INTERPRETERS[language] || language
     let mode = "stdout"
@@ -387,7 +387,7 @@ function parseExecMeta(meta, language) {
 /**
  * Execute a script with variable substitution.
  */
-async function runScript(block, metadata, $) {
+export async function runScript(block: any, metadata: any, $: any): Promise<{ output: string; stored: any }> {
     const { language, code, meta } = block
     const { interpreter: interp, mode } = parseExecMeta(meta, language)
 
@@ -459,7 +459,7 @@ async function runScript(block, metadata, $) {
 /**
  * Process all {exec} blocks in a step.
  */
-async function processScripts(step, metadata, $) {
+export async function processScripts(step: any, metadata: any, $: any): Promise<string> {
     let resultPrompt = step.prompt
 
     for (const block of step.codeBlocks) {
@@ -494,7 +494,7 @@ async function processScripts(step, metadata, $) {
  * Input: { message: "string", count: "number", active: "bool" }
  * Output: "\n\nFormat your response as JSON with the following keys: {message, count, active}. DO NOT add anything before or after the JSON response, as it will be used for parsing."
  */
-function buildParseFormatInstruction(parseConfig) {
+export function buildParseFormatInstruction(parseConfig: any): string {
     const keys = Object.keys(parseConfig).join(", ")
     return `\n\nFormat your response as JSON with the following keys: {${keys}}. DO NOT add anything before or after the JSON response, as it will be used for parsing.`
 }
@@ -515,7 +515,7 @@ function buildParseFormatInstruction(parseConfig) {
  * 1. JSON code block (```json ... ```)
  * 2. Raw JSON (no fences)
  */
-function parseResponse(responseText, parseConfig) {
+export function parseResponse(responseText: string, parseConfig: any): { success: boolean; data?: any; error?: string } {
     let jsonString = null
 
     // First, try to find JSON in code block
@@ -568,7 +568,7 @@ function parseResponse(responseText, parseConfig) {
  *
  * Returns: { success: boolean, data?: object, error?: string }
  */
-function processParse(step, responseText, metadata, client) {
+export function processParse(step: any, responseText: string, metadata: any, client: any): any {
     if (!step.config.parse) {
         return { success: true, data: metadata }
     }
@@ -595,7 +595,7 @@ function processParse(step, responseText, metadata, client) {
  * condition: "role === 'admin'" → true if metadata.role === 'admin'
  * Undefined variables in metadata are accessible as undefined.
  */
-function evaluateCondition(condition, metadata) {
+export function evaluateCondition(condition: string, metadata: any): boolean {
     try {
         // Get all unique identifiers from the condition
         const identifierPattern = /[A-Za-z_$][A-Za-z0-9_$]*/g
@@ -628,7 +628,7 @@ function evaluateCondition(condition, metadata) {
 /**
  * Find step index by its step name in config.
  */
-function findStepByName(steps, name) {
+export function findStepByName(steps: any[], name: string): number {
     for (let i = 0; i < steps.length; i++) {
         if (steps[i].config.step === name) {
             return i
@@ -648,7 +648,7 @@ function findStepByName(steps, name) {
  *
  * Returns: step index, or null to continue sequential
  */
-function resolveNextStep(next, steps, metadata) {
+export function resolveNextStep(next: any, steps: any[], metadata: any): number | null {
     if (!next) {
         return null
     }
@@ -945,605 +945,3 @@ export default async function literateCommandsPlugin({ client, $ }) {
     }
 }
 
-// ============================================================================
-// Tests (run with: node --test literate-commands.js)
-// ============================================================================
-
-function assert(condition, message) {
-    if (!condition) throw new Error(`FAIL: ${message}`)
-}
-
-function assertEqual(actual, expected, message) {
-    if (actual !== expected) {
-        throw new Error(`FAIL: ${message}\n  Expected: ${JSON.stringify(expected)}\n  Actual: ${JSON.stringify(actual)}`)
-    }
-}
-
-async function runTests() {
-    console.log("Running literate-commands tests...\n")
-
-    // Test: hasLiterateFrontmatter
-    assert(hasLiterateFrontmatter("---\nliterate: true\n---\n"), "hasLiterateFrontmatter should detect literate: true")
-    assert(!hasLiterateFrontmatter("---\nliterate: false\n---\n"), "hasLiterateFrontmatter should not detect false")
-    assert(!hasLiterateFrontmatter("No frontmatter"), "hasLiterateFrontmatter should return false without frontmatter")
-    console.log("✓ hasLiterateFrontmatter")
-
-    // Test: parseSimpleYaml
-    assertEqual(parseSimpleYaml("key: value").key, "value", "parseSimpleYaml basic")
-    assertEqual(parseSimpleYaml('key: "quoted"').key, "quoted", "parseSimpleYaml double quotes")
-    assertEqual(parseSimpleYaml("key: 123").key, 123, "parseSimpleYaml number")
-    assertEqual(parseSimpleYaml("key: true").key, true, "parseSimpleYaml boolean")
-    assertEqual(parseSimpleYaml("key: [a, b]").key[0], "a", "parseSimpleYaml array")
-    console.log("✓ parseSimpleYaml")
-
-    // Test: parseCodeBlocks
-    const blocks = parseCodeBlocks('```bash {exec}\necho hi\n```\n```python {exec mode=store}\nprint(1)\n```')
-    assertEqual(blocks.length, 2, "parseCodeBlocks should find 2 blocks")
-    assertEqual(blocks[0].language, "bash", "parseCodeBlocks language")
-    assert(blocks[0].meta.includes("exec"), "parseCodeBlocks should have exec in meta")
-    assertEqual(blocks[1].meta[1], "mode=store", "parseCodeBlocks mode")
-    console.log("✓ parseCodeBlocks")
-
-    // Test: parseLiterateMarkdown
-    const markdown = `---
-description: test
----
-Step 1
----
-Step 2`
-    const steps = parseLiterateMarkdown(markdown)
-    assertEqual(steps.length, 2, "parseLiterateMarkdown should find 2 steps")
-    console.log("✓ parseLiterateMarkdown")
-
-    // Test: parseExecMeta
-    assertEqual(parseExecMeta(["exec"], "python").interpreter, "python3", "parseExecMeta default python")
-    assertEqual(parseExecMeta(["exec"], "bash").interpreter, "bash", "parseExecMeta default bash")
-    assertEqual(parseExecMeta(["exec=uv", "run", "python"], "python").interpreter, "uv", "parseExecMeta custom interpreter")
-    assertEqual(parseExecMeta(["exec", "mode=store"], "python").mode, "store", "parseExecMeta mode")
-    console.log("✓ parseExecMeta")
-
-    // Test: getNestedValue
-    const obj = { a: { b: { c: "deep" } }, arr: [1, 2, 3] }
-    assertEqual(getNestedValue(obj, "a.b.c"), "deep", "getNestedValue deep")
-    assertEqual(getNestedValue(obj, "arr.0"), 1, "getNestedValue array")
-    assertEqual(getNestedValue(obj, "missing"), undefined, "getNestedValue missing")
-    console.log("✓ getNestedValue")
-
-    // Test: interpolate
-    const meta = { name: "Alice", count: 5, nested: { val: "x" } }
-    assertEqual(interpolate("Hello $name", meta), 'Hello "Alice"', "interpolate string")
-    assertEqual(interpolate("Count: $count", meta), "Count: 5", "interpolate number")
-    assertEqual(interpolate("Nested: $nested.val", meta), 'Nested: "x"', "interpolate nested")
-    assert(interpolate("All: $$", meta).includes('"name":"Alice"'), "interpolate $$ includes metadata")
-    assertEqual(interpolate("Raw $missing", meta), "Raw null", "interpolate missing")
-    console.log("✓ interpolate")
-
-    // Test: parseNestedYaml
-    const nestedYaml1 = `step: ask-info
-parse:
-    topic: "What is the topic?"
-    count: "What is the count?"`
-    const nestedResult1 = parseNestedYaml(nestedYaml1)
-    assertEqual(nestedResult1.step, "ask-info", "parseNestedYaml step")
-    assertEqual(nestedResult1.parse.topic, "What is the topic?", "parseNestedYaml nested topic")
-    assertEqual(nestedResult1.parse.count, "What is the count?", "parseNestedYaml nested count")
-    console.log("✓ parseNestedYaml")
-
-    // Test: parseNestedYaml with boolean key
-    const nestedYaml2 = `parse:
-    done?: "Is it done?"
-    ok: next`
-    const nestedResult2 = parseNestedYaml(nestedYaml2)
-    assertEqual(nestedResult2.parse["done?"], "Is it done?", "parseNestedYaml boolean key")
-    assertEqual(nestedResult2.parse.ok, "next", "parseNestedYaml regular key")
-    console.log("✓ parseNestedYaml boolean key")
-
-    // Test: parseStep preserves non-exec code blocks
-    const stepWithJson = `\`\`\`yaml {config}
-step: test
-\`\`\`
-Here is JSON:
-\`\`\`json
-{"topic": "test"}
-\`\`\`
-And exec:
-\`\`\`bash {exec}
-echo hi
-\`\`\`
-Done.`
-    const parsedStep = parseStep(stepWithJson)
-    assertEqual(parsedStep.codeBlocks.length, 2, "parseStep finds both blocks")
-    // All code blocks are PRESERVED in the prompt (not removed)
-    assert(parsedStep.prompt.includes('```json'), "parseStep preserves json block in prompt")
-    assert(parsedStep.prompt.includes('```bash {exec}'), "parseStep preserves exec block in prompt")
-    assert(parsedStep.prompt.includes('echo hi'), "parseStep preserves exec block content")
-    // Non-exec blocks have fullBlock property
-    assert(parsedStep.codeBlocks[0].fullBlock, "parseStep stores fullBlock for json")
-    assert(parsedStep.codeBlocks[1].fullBlock, "parseStep stores fullBlock for exec")
-    console.log("✓ parseStep preserves all code blocks in prompt")
-
-    // Test: parseResponse with JSON (type-based format)
-    const jsonResponse = '```json\n{"topic": "AI", "count": 42}\n```'
-    const parseConfig1 = { topic: "string", count: "number" }
-    const parsed1 = parseResponse(jsonResponse, parseConfig1)
-    assertEqual(parsed1.success, true, "parseResponse JSON success")
-    assertEqual(parsed1.data.topic, "AI", "parseResponse JSON topic")
-    assertEqual(parsed1.data.count, 42, "parseResponse JSON count (number type)")
-    console.log("✓ parseResponse type-based JSON")
-
-    // Test: parseResponse with bool
-    const boolResponse = '{"done": true}'
-    const parseConfig2 = { done: "bool" }
-    const parsed2 = parseResponse(boolResponse, parseConfig2)
-    assertEqual(parsed2.success, true, "parseResponse bool success")
-    assertEqual(parsed2.data.done, true, "parseResponse bool true")
-    console.log("✓ parseResponse bool")
-
-    // Test: parseResponse plain text (no JSON) - should fail
-    const textResponse = "Topic: Machine Learning\nCount: 10"
-    const parseConfig3 = { topic: "string", count: "number" }
-    const parsed3 = parseResponse(textResponse, parseConfig3)
-    assertEqual(parsed3.success, false, "parseResponse plain text fails (no JSON)")
-    console.log("✓ parseResponse plain text fails")
-
-    // ============================================================================
-    // New Parse Functionality Tests (Phase 6)
-    // ============================================================================
-
-    // Test: buildParseFormatInstruction - generates correct instruction
-    const formatInstr1 = buildParseFormatInstruction({ message: "string", count: "number" })
-    assert(formatInstr1.includes("message"), "buildParseFormatInstruction includes message")
-    assert(formatInstr1.includes("count"), "buildParseFormatInstruction includes count")
-    assert(formatInstr1.includes("DO NOT add anything"), "buildParseFormatInstruction includes instruction")
-    console.log("✓ buildParseFormatInstruction basic")
-
-    // Test: buildParseFormatInstruction - single key
-    const formatInstr2 = buildParseFormatInstruction({ name: "string" })
-    assert(formatInstr2.includes("{name}"), "buildParseFormatInstruction single key format")
-    console.log("✓ buildParseFormatInstruction single key")
-
-    // Test: parseResponse - type-based format with JSON (NEW FORMAT)
-    const newParseConfig1 = { msg: "string", num: "number", flag: "bool" }
-    const newJsonResponse = '{"msg": "hello", "num": 42, "flag": true}'
-    const newParsed1 = parseResponse(newJsonResponse, newParseConfig1)
-    assertEqual(newParsed1.success, true, "parseResponse type-based success")
-    assertEqual(newParsed1.data.msg, "hello", "parseResponse string type")
-    assertEqual(newParsed1.data.num, 42, "parseResponse number type (not string)")
-    assertEqual(newParsed1.data.flag, true, "parseResponse bool type")
-    console.log("✓ parseResponse type-based JSON extraction")
-
-    // Test: parseResponse - bool false
-    const boolFalseResponse = '{"active": false}'
-    const boolFalseConfig = { active: "bool" }
-    const boolFalseResult = parseResponse(boolFalseResponse, boolFalseConfig)
-    assertEqual(boolFalseResult.success, true, "parseResponse bool false success")
-    assertEqual(boolFalseResult.data.active, false, "parseResponse bool false value")
-    console.log("✓ parseResponse bool false")
-
-    // Test: parseResponse - failure returns success: false
-    const badResponse = "This is not JSON at all"
-    const badResult = parseResponse(badResponse, newParseConfig1)
-    assertEqual(badResult.success, false, "parseResponse failure returns success: false")
-    assert(badResult.error, "parseResponse failure returns error message")
-    console.log("✓ parseResponse failure returns success: false")
-
-    // Test: parseResponse - invalid JSON in block
-    const invalidJsonResponse = '```json\n{invalid json}\n```'
-    const invalidResult = parseResponse(invalidJsonResponse, newParseConfig1)
-    assertEqual(invalidResult.success, false, "parseResponse invalid JSON returns failure")
-    console.log("✓ parseResponse invalid JSON")
-
-    // Test: parseResponse - raw JSON without code fences
-    const rawJsonResponse = '{"msg": "raw", "num": 100, "flag": false}'
-    const rawResult = parseResponse(rawJsonResponse, newParseConfig1)
-    assertEqual(rawResult.success, true, "parseResponse raw JSON success")
-    assertEqual(rawResult.data.msg, "raw", "parseResponse raw JSON extraction")
-    console.log("✓ parseResponse raw JSON")
-
-    // Test: parseResponse - partial keys (missing some)
-    const partialResponse = '{"msg": "partial"}'
-    const partialResult = parseResponse(partialResponse, newParseConfig1)
-    assertEqual(partialResult.success, true, "parseResponse partial keys success")
-    assertEqual(partialResult.data.msg, "partial", "parseResponse partial - extracted key")
-    assertEqual(partialResult.data.num, undefined, "parseResponse partial - missing key undefined")
-    console.log("✓ parseResponse partial keys")
-
-    // Test: parseResponse - JSON with code fences
-    const fencedResponse = '```json\n{"msg": "fenced", "num": 5, "flag": true}\n```'
-    const fencedResult = parseResponse(fencedResponse, newParseConfig1)
-    assertEqual(fencedResult.success, true, "parseResponse fenced JSON success")
-    assertEqual(fencedResult.data.msg, "fenced", "parseResponse fenced JSON extraction")
-    console.log("✓ parseResponse fenced JSON")
-
-    // ============================================================================
-    // Routing Tests (Phase 7)
-    // ============================================================================
-
-    console.log("\n--- Routing Tests ---\n")
-
-    // Test: evaluateCondition - simple equality
-    assertEqual(evaluateCondition("role === 'admin'", { role: 'admin' }), true, "evaluateCondition admin true")
-    assertEqual(evaluateCondition("role === 'admin'", { role: 'user' }), false, "evaluateCondition admin false")
-    console.log("✓ evaluateCondition equality")
-
-    // Test: evaluateCondition - string with double quotes
-    assertEqual(evaluateCondition('role === "admin"', { role: 'admin' }), true, "evaluateCondition double quotes")
-    console.log("✓ evaluateCondition double quotes")
-
-    // Test: evaluateCondition - number comparison
-    assertEqual(evaluateCondition("age > 18", { age: 25 }), true, "evaluateCondition age > 18 true")
-    assertEqual(evaluateCondition("age > 18", { age: 15 }), false, "evaluateCondition age > 18 false")
-    assertEqual(evaluateCondition("age >= 18", { age: 18 }), true, "evaluateCondition age >= 18")
-    assertEqual(evaluateCondition("age < 21", { age: 20 }), true, "evaluateCondition age < 21")
-    console.log("✓ evaluateCondition number comparison")
-
-    // Test: evaluateCondition - boolean variable
-    assertEqual(evaluateCondition("isAdmin", { isAdmin: true }), true, "evaluateCondition boolean true")
-    assertEqual(evaluateCondition("isAdmin", { isAdmin: false }), false, "evaluateCondition boolean false")
-    console.log("✓ evaluateCondition boolean")
-
-    // Test: evaluateCondition - AND/OR logic
-    assertEqual(evaluateCondition("role === 'admin' && age > 18", { role: 'admin', age: 25 }), true, "evaluateCondition AND true")
-    assertEqual(evaluateCondition("role === 'admin' && age > 18", { role: 'admin', age: 15 }), false, "evaluateCondition AND false")
-    assertEqual(evaluateCondition("role === 'admin' || role === 'editor'", { role: 'user' }), false, "evaluateCondition OR false")
-    assertEqual(evaluateCondition("role === 'admin' || role === 'editor'", { role: 'editor' }), true, "evaluateCondition OR true")
-    console.log("✓ evaluateCondition AND/OR logic")
-
-    // Test: evaluateCondition - string methods
-    assertEqual(evaluateCondition("name.includes('John')", { name: 'John Doe' }), true, "evaluateCondition string includes")
-    assertEqual(evaluateCondition("email.endsWith('@corp.com')", { email: 'user@corp.com' }), true, "evaluateCondition endsWith")
-    assertEqual(evaluateCondition("name.toLowerCase() === 'alice'", { name: 'ALICE' }), true, "evaluateCondition toLowerCase")
-    console.log("✓ evaluateCondition string methods")
-
-    // Test: evaluateCondition - undefined variable
-    assertEqual(evaluateCondition("missing === undefined", {}), true, "evaluateCondition undefined variable")
-    assertEqual(evaluateCondition("name !== undefined", {}), false, "evaluateCondition missing variable")
-    console.log("✓ evaluateCondition undefined handling")
-
-    // Test: evaluateCondition - invalid expression
-    assertEqual(evaluateCondition("role ===", {}), false, "evaluateCondition invalid expression")
-    console.log("✓ evaluateCondition invalid expression handling")
-
-    // Test: findStepByName - basic
-    const testSteps = [
-        { config: { step: 'ask-role' }, prompt: 'What role?' },
-        { config: { step: 'admin-panel' }, prompt: 'Admin panel' },
-        { config: { step: 'user-panel' }, prompt: 'User panel' }
-    ]
-    assertEqual(findStepByName(testSteps, 'admin-panel'), 1, "findStepByName found")
-    assertEqual(findStepByName(testSteps, 'user-panel'), 2, "findStepByName user-panel")
-    assertEqual(findStepByName(testSteps, 'missing'), -1, "findStepByName not found")
-    assertEqual(findStepByName([], 'anything'), -1, "findStepByName empty array")
-    console.log("✓ findStepByName")
-
-    // Test: resolveNextStep - simple string redirect
-    assertEqual(resolveNextStep("admin-panel", testSteps, {}), 1, "resolveNextStep simple string")
-    assertEqual(resolveNextStep("user-panel", testSteps, {}), 2, "resolveNextStep another step")
-    assertEqual(resolveNextStep("missing-step", testSteps, {}), null, "resolveNextStep not found returns null")
-    console.log("✓ resolveNextStep simple string")
-
-    // Test: resolveNextStep - no next config
-    assertEqual(resolveNextStep(null, testSteps, {}), null, "resolveNextStep null")
-    assertEqual(resolveNextStep(undefined, testSteps, {}), null, "resolveNextStep undefined")
-    assertEqual(resolveNextStep("", testSteps, {}), null, "resolveNextStep empty string")
-    console.log("✓ resolveNextStep no config")
-
-    // Test: resolveNextStep - conditional map, first match wins
-    const roleConditions = {
-        "role === 'admin'": 'admin-panel',
-        "role === 'user'": 'user-panel',
-        _: 'ask-role'  // fallback to first step
-    }
-    assertEqual(resolveNextStep(roleConditions, testSteps, { role: 'admin' }), 1, "resolveNextStep admin condition")
-    assertEqual(resolveNextStep(roleConditions, testSteps, { role: 'user' }), 2, "resolveNextStep user condition")
-    assertEqual(resolveNextStep(roleConditions, testSteps, { role: 'guest' }), 0, "resolveNextStep guest falls to _")
-    console.log("✓ resolveNextStep conditional map")
-
-    // Test: resolveNextStep - conditional map, no match, no fallback
-    const noFallbackConditions = {
-        "role === 'admin'": 'admin-panel',
-        "role === 'user'": 'user-panel'
-    }
-    assertEqual(resolveNextStep(noFallbackConditions, testSteps, { role: 'guest' }), null, "resolveNextStep no match, no fallback")
-    console.log("✓ resolveNextStep no match, no fallback")
-
-    // Test: resolveNextStep - conditional with boolean variable
-    const boolConditions = {
-        "isAdmin": 'admin-panel',
-        _: 'user-panel'
-    }
-    assertEqual(resolveNextStep(boolConditions, testSteps, { isAdmin: true }), 1, "resolveNextStep bool true")
-    assertEqual(resolveNextStep(boolConditions, testSteps, { isAdmin: false }), 2, "resolveNextStep bool false")
-    console.log("✓ resolveNextStep boolean condition")
-
-    // Test: resolveNextStep - conditional with number comparison
-    const ageConditions = {
-        "age >= 18": 'adult-panel',
-        _: 'minor-panel'
-    }
-    const minorSteps = [
-        { config: { step: 'ask-age' }, prompt: 'How old?' },
-        { config: { step: 'adult-panel' }, prompt: 'Adult' },
-        { config: { step: 'minor-panel' }, prompt: 'Minor' }
-    ]
-    assertEqual(resolveNextStep(ageConditions, minorSteps, { age: 25 }), 1, "resolveNextStep adult age")
-    assertEqual(resolveNextStep(ageConditions, minorSteps, { age: 15 }), 2, "resolveNextStep minor age")
-    console.log("✓ resolveNextStep number comparison")
-
-    // Test: resolveNextStep - first match wins (order matters)
-    const priorityConditions = {
-        "role === 'admin'": 'admin-panel',
-        "role !== 'user'": 'user-panel',  // Should not match admin (already matched), but 'other' != 'user' so matches here
-        _: 'ask-role'
-    }
-    assertEqual(resolveNextStep(priorityConditions, testSteps, { role: 'admin' }), 1, "resolveNextStep first match wins")
-    assertEqual(resolveNextStep(priorityConditions, testSteps, { role: 'other' }), 2, "resolveNextStep falls through to user-panel")
-    console.log("✓ resolveNextStep first match wins")
-
-    // Test: resolveNextStep - complex conditions
-    const complexConditions = {
-        "role === 'admin' && age >= 18": 'full-admin',
-        "role === 'admin'": 'limited-admin',
-        "age >= 18": 'adult-panel',
-        _: 'default'
-    }
-    const complexSteps = [
-        { config: { step: 'start' }, prompt: 'Start' },
-        { config: { step: 'full-admin' }, prompt: 'Full admin' },
-        { config: { step: 'limited-admin' }, prompt: 'Limited admin' },
-        { config: { step: 'adult-panel' }, prompt: 'Adult panel' },
-        { config: { step: 'default' }, prompt: 'Default' }
-    ]
-    assertEqual(resolveNextStep(complexConditions, complexSteps, { role: 'admin', age: 25 }), 1, "resolveNextStep complex AND match")
-    assertEqual(resolveNextStep(complexConditions, complexSteps, { role: 'admin', age: 15 }), 2, "resolveNextStep complex partial")
-    assertEqual(resolveNextStep(complexConditions, complexSteps, { role: 'user', age: 20 }), 3, "resolveNextStep complex adult")
-    assertEqual(resolveNextStep(complexConditions, complexSteps, { role: 'guest', age: 10 }), 4, "resolveNextStep complex default")
-    console.log("✓ resolveNextStep complex conditions")
-
-    // Test: resolveNextStep - string contains
-    const stringConditions = {
-        "email.includes('@admin')": 'admin-panel',
-        "email.includes('@')": 'user-panel',
-        _: 'ask-role'
-    }
-    assertEqual(resolveNextStep(stringConditions, testSteps, { email: 'boss@admin.com' }), 1, "resolveNextStep string contains admin")
-    assertEqual(resolveNextStep(stringConditions, testSteps, { email: 'user@example.com' }), 2, "resolveNextStep string contains @")
-    assertEqual(resolveNextStep(stringConditions, testSteps, { email: 'invalid-email' }), 0, "resolveNextStep string no match")
-    console.log("✓ resolveNextStep string contains")
-
-    // Test: resolveNextStep - target step not found
-    const brokenConditions = {
-        "role === 'admin'": 'nonexistent-step',
-        _: 'ask-role'  // fallback exists, but admin-panel doesn't
-    }
-    assertEqual(resolveNextStep(brokenConditions, testSteps, { role: 'admin' }), null, "resolveNextStep target not found")
-    assertEqual(resolveNextStep(brokenConditions, testSteps, { role: 'guest' }), 0, "resolveNextStep fallback works")
-    console.log("✓ resolveNextStep target step not found")
-
-    // Test: resolveNextStep - metadata with special characters
-    assertEqual(resolveNextStep({ "name.includes(\"John\")": 'admin-panel' }, testSteps, { name: "John Doe" }), 1, "resolveNextStep quotes in condition")
-    console.log("✓ resolveNextStep special characters in metadata")
-
-    // Test: resolveNextStep - empty metadata
-    assertEqual(resolveNextStep({ "isAdmin": 'admin-panel', _: 'user-panel' }, testSteps, {}), 2, "resolveNextStep empty metadata falls to _")
-    console.log("✓ resolveNextStep empty metadata")
-
-    console.log("\n✅ Routing tests passed!")
-    console.log("\n✅ Parse Functionality tests passed!")
-    console.log("\n✅ All tests passed!")
-}
-
-// ============================================================================
-// Script Execution & Interpolation Tests
-// ============================================================================
-
-async function runAsyncTests() {
-    console.log("\n--- Script Execution & Interpolation Tests ---\n")
-
-    // Test: runScript - bash echo (stdout mode)
-    const bashResult = await runScript(
-        { language: "bash", code: 'echo "Hello World"', meta: ["exec"] },
-        {},
-        null
-    )
-    assertEqual(bashResult.output, "Hello World", "runScript bash echo")
-    console.log("✓ runScript bash echo (stdout)")
-
-    // Test: runScript - python print (stdout mode)
-    const pyResult = await runScript(
-        { language: "python", code: 'print("Python Hello")', meta: ["exec"] },
-        {},
-        null
-    )
-    assertEqual(pyResult.output, "Python Hello", "runScript python print")
-    console.log("✓ runScript python print (stdout)")
-
-    // Test: runScript - with variable substitution (shell-safe, single-quoted)
-    const subResult = await runScript(
-        { language: "bash", code: 'echo "Hello $name"', meta: ["exec"] },
-        { name: "Alice" },
-        null
-    )
-    assertEqual(subResult.output, "Hello 'Alice'", "runScript variable substitution")
-    console.log("✓ runScript variable substitution")
-
-    // Test: runScript - store mode (JSON output)
-    const storeResult = await runScript(
-        { language: "python", code: 'import json; print(json.dumps({"count": 5, "topic": "test"}))', meta: ["exec", "mode=store"] },
-        {},
-        null
-    )
-    assertEqual(storeResult.stored.count, 5, "runScript store mode count")
-    assertEqual(storeResult.stored.topic, "test", "runScript store mode topic")
-    assertEqual(storeResult.output, "", "runScript store mode output is empty")
-    console.log("✓ runScript store mode")
-
-    // Test: runScript - store mode returns stored object (merge happens in processScripts)
-    const storeCheck = await runScript(
-        { language: "python", code: 'import json; print(json.dumps({"new": "data"}))', meta: ["exec", "mode=store"] },
-        {},
-        null
-    )
-    assertEqual(storeCheck.stored.new, "data", "runScript returns stored object")
-    console.log("✓ runScript store returns object")
-
-    // Test: runScript - none mode (silent execution)
-    const noneResult = await runScript(
-        { language: "bash", code: 'echo "invisible"', meta: ["exec", "mode=none"] },
-        {},
-        null
-    )
-    assertEqual(noneResult.output, "", "runScript none mode has no output")
-    assertEqual(noneResult.stored, null, "runScript none mode has no stored")
-    console.log("✓ runScript none mode")
-
-    // Test: runScript - error handling
-    const errorResult = await runScript(
-        { language: "bash", code: 'exit 1', meta: ["exec"] },
-        {},
-        null
-    )
-    assert(errorResult.output.includes("error"), "runScript handles errors")
-    console.log("✓ runScript error handling")
-
-    // Test: runScript - custom interpreter with exec= syntax
-    const customResult = await runScript(
-        { language: "bash", code: 'echo "custom"', meta: ["exec=echo"] },
-        {},
-        null
-    )
-    // Note: exec=echo will run "echo" directly, not as shell command
-    // This tests the custom interpreter parsing
-    console.log("✓ runScript custom interpreter parsing")
-
-    // Test: processScripts - replaces exec blocks with output
-    // Test using parseStep to ensure consistent step structure
-    const testMarkdown = `\`\`\`yaml {config}
-step: test
-\`\`\`
-Before
-\`\`\`bash {exec}
-echo ONE
-\`\`\`
-Middle
-\`\`\`python {exec}
-print('TWO')
-\`\`\`
-After`
-    const parsedStep = parseStep(testMarkdown)
-    const processedPrompt = await processScripts(parsedStep, {}, null)
-    assert(processedPrompt.includes("ONE"), "processScripts replaces bash block with output")
-    assert(processedPrompt.includes("TWO"), "processScripts replaces python block with output")
-    assert(!processedPrompt.includes("```bash"), "processScripts removes bash block markers")
-    assert(!processedPrompt.includes("```python"), "processScripts removes python block markers")
-    console.log("✓ processScripts replaces exec blocks with output")
-
-    // Test: processScripts - preserves non-exec blocks
-    const stepWithJson = {
-        prompt: "```json\n{\"key\": \"value\"}\n```\n```bash {exec}\necho done\n```",
-        codeBlocks: [
-            { language: "json", code: '{"key": "value"}', meta: [] },
-            { language: "bash", code: "echo done", meta: ["exec"] }
-        ],
-        config: {}
-    }
-    const processedJson = await processScripts(stepWithJson, {}, null)
-    assert(processedJson.includes('```json'), "processScripts preserves json block")
-    assert(processedJson.includes("done"), "processScripts processes exec block")
-    console.log("✓ processScripts preserves non-exec blocks")
-
-    // Test: processScripts - updates metadata from store mode
-    const metaStoreStep = {
-        prompt: "```python {exec mode=store}\nimport json; print(json.dumps({\"count\": 10}))\n```",
-        codeBlocks: [
-            { language: "python", code: 'import json; print(json.dumps({"count": 10}))', meta: ["exec", "mode=store"] }
-        ],
-        config: {}
-    }
-    const testMeta = {}
-    await processScripts(metaStoreStep, testMeta, null)
-    assertEqual(testMeta.count, 10, "processScripts updates metadata from store")
-    console.log("✓ processScripts metadata from store")
-
-    // Test: interpolate - multiple variables
-    assertEqual(
-        interpolate("Hello $name, you have $count items", { name: "Bob", count: 3 }),
-        'Hello "Bob", you have 3 items',
-        "interpolate multiple vars"
-    )
-    console.log("✓ interpolate multiple variables")
-
-    // Test: interpolate - escape sequences
-    assertEqual(
-        interpolate("$name", { name: 'Hello "World"' }),
-        '"Hello \\"World\\""',
-        "interpolate escaped quotes"
-    )
-    console.log("✓ interpolate escaped quotes")
-
-    // Test: interpolate - special characters in values
-    assertEqual(
-        interpolate("$msg", { msg: "Line1\nLine2" }),
-        '"Line1\\nLine2"',
-        "interpolate newlines"
-    )
-    console.log("✓ interpolate special characters")
-
-    // Test: interpolate - boolean values
-    assertEqual(
-        interpolate("Enabled: $enabled", { enabled: true }),
-        "Enabled: true",
-        "interpolate boolean true"
-    )
-    assertEqual(
-        interpolate("Enabled: $enabled", { enabled: false }),
-        "Enabled: false",
-        "interpolate boolean false"
-    )
-    console.log("✓ interpolate boolean values")
-
-    // Test: interpolate - null/undefined
-    assertEqual(
-        interpolate("Value: $missing", { other: "exists" }),
-        "Value: null",
-        "interpolate undefined becomes null"
-    )
-    console.log("✓ interpolate undefined handling")
-
-    // Test: interpolate - nested object access
-    const nested = { user: { profile: { name: "Alice" } }, items: [{ id: 1 }, { id: 2 }] }
-    assertEqual(
-        interpolate("User: $user.profile.name", nested),
-        'User: "Alice"',
-        "interpolate deep nested"
-    )
-    assertEqual(
-        interpolate("First: $items.0.id", nested),
-        "First: 1",
-        "interpolate array index"
-    )
-    console.log("✓ interpolate nested access")
-
-    // Test: interpolate - $$ for full metadata
-    const fullMeta = { a: 1, b: 2 }
-    const fullResult = interpolate("$$", fullMeta)
-    assert(fullResult.includes('"a":1'), "interpolate $$ includes values")
-    assert(fullResult.includes('"b":2'), "interpolate $$ includes all keys")
-    console.log("✓ interpolate $$ full metadata")
-
-    console.log("\n✅ Script Execution & Interpolation tests passed!")
-}
-
-// Run tests if executed directly
-if (import.meta.url === `file://${process.argv[1]}`) {
-    // Convert runTests to async wrapper
-    runTests().then(() => {
-        return runAsyncTests()
-    }).then(() => {
-        console.log("\n🎉 All test suites passed!")
-        process.exit(0)
-    }).catch(err => {
-        console.error("\n❌ Test failed:", err.message)
-        process.exit(1)
-    })
-}
