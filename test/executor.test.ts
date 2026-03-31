@@ -71,8 +71,9 @@ describe("runScript", () => {
             {},
             null
         )
-        expect(result.stored.count).toBe(5)
-        expect(result.stored.topic).toBe("test")
+        expect(result.stored).not.toBeNull()
+        expect(result.stored!.count).toBe(5)
+        expect(result.stored!.topic).toBe("test")
         expect(result.output).toBe("")
     })
 
