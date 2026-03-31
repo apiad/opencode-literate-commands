@@ -19,7 +19,7 @@ parse:
   confirmed: bool
 ```
 
-**$name**, it's wonderful to meet you! Would you like me to greet you formally?
+**$name**, it's wonderful to meet you! Would you like me to greet you formally? Please confirm.
 
 ---
 
@@ -30,9 +30,8 @@ next:
   _: casual
 ```
 
-```bash {exec}
-echo "Routing to greeting style..."
-```
+Routing...
+
 ---
 
 ```yaml {config}

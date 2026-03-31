@@ -73,37 +73,29 @@ The plugin accepts these options in `opencode.json`:
 
 Create markdown files in your `commandsDir` with the `literate: true` frontmatter:
 
-```markdown
----
-description: My command description
-literate: true
----
+    ---
+    description: My command description
+    literate: true
+    ---
 
-# Command Title
+    ```yaml {config}
+    step: step-one
+    parse:
+      name: "What is your name?"
+    ```
 
-## Step 1: First Step
+    Your prompt text here. Variables like $name will be substituted.
 
-```yaml {config}
-step: step-one
-parse:
-  name: "What is your name?"
-```
+    ---
 
-Your prompt text here. Variables like $name will be substituted.
+    ```yaml {config}
+    step: step-two
+    next:
+      "confirmed === true": success
+      _: failure
+    ```
 
----
-
-## Step 2: Second Step
-
-```yaml {config}
-step: step-two
-next:
-  "confirmed === true": success
-  _: failure
-```
-
-More content...
-```
+    More content...
 
 ### Frontmatter
 
@@ -155,11 +147,13 @@ The model will be asked to respond with JSON containing these keys.
 ### Routing
 
 Simple redirect:
+
 ```yaml
 next: other-step
 ```
 
 Conditional routing:
+
 ```yaml
 next:
   "role === 'admin'": admin-panel
@@ -171,16 +165,14 @@ next:
 
 Execute scripts within steps:
 
-````markdown
-```bash {exec}
-echo "Hello $name"
-```
+  ```bash {exec}
+  echo "Hello $name"
+  ```
 
-```python {exec mode=store}
-import json
-print(json.dumps({"result": 42}))
-```
-````
+  ```python {exec mode=store}
+  import json
+  print(json.dumps({"result": 42}))
+  ```
 
 | Syntax | Description |
 |--------|-------------|
@@ -202,12 +194,10 @@ Use `$variable` to reference collected data:
 
 ### Examples
 
-```markdown
-Hello, **$name**!        → Hello, **Alice**!
-Count: $count            → Count: 42
-User: $user.email        → User: alice@example.com
-First item: $items.0     → First item: apple
-```
+  Hello, **$name**!        → Hello, **Alice**!
+  Count: $count            → Count: 42
+  User: $user.email        → User: alice@example.com
+  First item: $items.0     → First item: apple
 
 ### Shell Variables
 
