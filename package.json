@@ -10,12 +10,14 @@
     }
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && npm run bundle",
+    "bundle": "esbuild index.ts --bundle --format=esm --outfile=literate-commands.js --platform=node",
     "test": "vitest run",
     "test:watch": "vitest"
   },
   "files": [
     "dist/",
+    "literate-commands.js",
     "examples/"
   ],
   "keywords": [
@@ -32,6 +34,7 @@
   "license": "MIT",
   "devDependencies": {
     "@types/node": "^20.10.0",
+    "esbuild": "^0.27.4",
     "vitest": "^1.2.0"
   },
   "peerDependencies": {
