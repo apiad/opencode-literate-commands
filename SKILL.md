@@ -37,7 +37,6 @@ Second step content...
 
 Each step can have a YAML config block to control behavior:
 
-```markdown
 ```yaml {config}
 step: unique-step-name
 parse:
@@ -46,7 +45,6 @@ next:
   "condition": target-step
 stop: true
 ```
-```
 
 ### Config Options
 
@@ -54,13 +52,14 @@ stop: true
 |--------|------|-------------|
 | `step` | string | Unique name for routing (use `kebab-case`) |
 | `parse` | object | Variables to extract from user response |
-| `next` | string \| object | Routing rules after this step |
+| `next` | string | object | Routing rules after this step |
 | `stop` | boolean | End command after this step |
 | `exec` | object | Script execution settings |
 
 ### Step Examples
 
 **Collect data:**
+
 ```yaml
 parse:
   username: string
@@ -69,6 +68,7 @@ parse:
 ```
 
 **Route conditionally:**
+
 ```yaml
 next:
   "role === 'admin'": admin-panel
@@ -77,6 +77,7 @@ next:
 ```
 
 **End command:**
+
 ```yaml
 stop: true
 ```
@@ -93,6 +94,7 @@ parse:
 ```
 
 The model will be prompted to respond with:
+
 ```json
 {"name": "...", "count": 0, "active": true}
 ```
@@ -123,6 +125,7 @@ Hello **$name**! You selected $count items.
 ```
 
 If `name=Alice` and `count=42`:
+
 ```
 Hello **Alice**! You selected 42 items.
 ```
@@ -137,6 +140,7 @@ next: other-step
 ```
 
 ### Conditional Routing
+
 ```yaml
 next:
   "role === 'admin'": admin-panel
@@ -149,6 +153,7 @@ The `_` key is the fallback when no condition matches.
 ### Condition Syntax
 
 Use JavaScript-style expressions:
+
 - `"confirmed === true"`
 - `"count > 10"`
 - `"role !== 'guest'"`
@@ -159,18 +164,16 @@ Use JavaScript-style expressions:
 Run scripts within steps. The agent sees the result, or you can store variables.
 
 ### Basic Execution
-```markdown
+
 ```bash {exec}
 echo "Hello $name"
 ```
-```
 
 ### Store Output as Variables
-```markdown
+
 ```python {exec mode=store}
 import json
 print(json.dumps({"result": len("$name")}))
-```
 ```
 
 ### Exec Modes
@@ -183,82 +186,79 @@ print(json.dumps({"result": len("$name")}))
 
 ### Interpreters
 
-Specify the interpreter explicitly:
-```markdown
-```python {exec}
+Specify the interpreter explicitly if its not the default:
+
+```python {exec=uv run python -c}
 print("Python!")
 ```
-```bash {exec}
+
+```bash {exec=sh -c}
 echo "Bash!"
 ```
-```javascript {exec}
+
+```javascript {exec=node -c}
 console.log("Node!");
-```
 ```
 
 ## Complete Example
 
-```markdown
----
-description: Project setup wizard
-literate: true
----
+    ---
+    description: Project setup wizard
+    literate: true
+    ---
 
-```yaml {config}
-step: project-name
-parse:
-  name: string
-  type: string
-```
+    ```yaml {config}
+    step: project-name
+    parse:
+      name: string
+      type: string
+    ```
 
-What would you like to name your project, and what type is it?
+    What would you like to name your project, and what type is it?
 
----
+    ---
 
-```yaml {config}
-step: confirm
-next:
-  "confirmed === true": create
-  _: cancel
-```
+    ```yaml {config}
+    step: confirm
+    next:
+      "confirmed === true": create
+      _: cancel
+    ```
 
-Ready to create **$name** ($type)? Type `true` or `false`.
+    Ready to create **$name** ($type)? Type `true` or `false`.
 
----
+    ---
 
-```yaml {config}
-step: create
-parse:
-  confirmed: bool
-exec:
-  interpreter: bash
-```
+    ```yaml {config}
+    step: create
+    parse:
+      confirmed: bool
+    ```
 
-Let me set that up for you:
+    Let me set that up for you:
 
-```bash {exec mode=store}
-mkdir -p "$name"
-echo '{"created": true, "path": "'$name'"}'
-```
+    ```bash {exec mode=store}
+    mkdir -p "$name"
+    echo '{"created": true, "path": "'$name'"}'
+    ```
 
----
+    ---
 
-```yaml {config}
-step: success
-stop: true
-```
+    ```yaml {config}
+    step: success
+    stop: true
+    ```
 
-✓ Project **$name** created successfully!
+    ✓ Project **$name** created successfully!
 
----
+    ---
 
-```yaml {config}
-step: cancel
-stop: true
-```
+    ```yaml {config}
+    step: cancel
+    stop: true
+    ```
 
 Project creation cancelled. Let me know if you need anything else!
-```
 
 ## Tips
 
