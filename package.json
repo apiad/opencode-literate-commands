@@ -3,20 +3,21 @@
   "version": "1.0.0",
   "description": "OpenCode plugin for step-by-step command execution from markdown",
   "type": "module",
-  "main": "index.ts",
+  "main": "dist/index.js",
   "exports": {
     ".": {
-      "import": "./index.ts"
+      "import": "./dist/index.js"
     }
   },
-  "files": [
-    "index.ts",
-    "examples/"
-  ],
   "scripts": {
+    "build": "tsc",
     "test": "vitest run",
     "test:watch": "vitest"
   },
+  "files": [
+    "dist/",
+    "examples/"
+  ],
   "keywords": [
     "opencode",
     "opencode-plugin",
