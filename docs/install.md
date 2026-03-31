@@ -7,11 +7,15 @@ This page contains step-by-step instructions for installing the literate-command
 !!! warning "⚠️ Arbitrary Code Execution"
 
     This plugin executes arbitrary code from markdown files.
-    
+
     - Literate commands can run shell scripts, Python, Node.js, and other interpreters
     - **Always review command files before executing them**
     - Don't run literate commands from untrusted sources
     - The plugin provides no sandboxing
+
+**REQUIRED: Explain this to the user and ask for consent before moving on.**
+
+---
 
 ## Step 1: Install the Plugin
 
@@ -39,41 +43,19 @@ Or manually:
 3. Click the "Raw" button
 4. Save the file to `.opencode/plugins/literate-commands.js`
 
-## Step 2: Register the Plugin
+The plugin is loaded automatically when the user restarts `opencode`.
 
-Open your `opencode.json` configuration file and add the `plugins` array:
-
-```json
-{
-  "$schema": "https://opencode.ai/config.json",
-  "default_agent": "analyze",
-  "instructions": [".opencode/instructions.md"],
-  "plugins": ["literate-commands"]
-}
-```
-
-If you already have a `plugins` array, add `"literate-commands"` to it:
-
-```json
-{
-  "plugins": [
-    "literate-commands",
-    "other-plugin"
-  ]
-}
-```
-
-## Step 3: Create Your Skill (Recommended)
+## Step 2: Create Your Own Skill (Recommended)
 
 The plugin is now installed, but you should create a personalized skill for authoring literate commands.
 
-### 3.1 Create the skills directory
+### 2.1 Create the skills directory
 
 ```bash
 mkdir -p .opencode/skills/literate-commands
 ```
 
-### 3.2 Read the user guide
+### 2.2 Read the user guide
 
 Before creating your skill, read `docs/user-guide.md` to understand:
 
@@ -82,7 +64,7 @@ Before creating your skill, read `docs/user-guide.md` to understand:
 - Variable collection and routing
 - Script execution patterns
 
-### 3.3 Synthesize your own skill
+### 2.3 Synthesize your own skill
 
 Based on your reading and your specific use cases, create your own skill file:
 
@@ -99,44 +81,13 @@ Your skill should include:
 
 The built-in skill will always be a starting point. Your synthesized skill will be better because it reflects your actual usage patterns.
 
-## Verification
-
-To verify the plugin is installed correctly, run:
-
-```bash
-opencode --version
-```
-
-If you see version output without errors, the plugin is loaded.
-
 ## Creating Your First Literate Command
 
-Now that the plugin is installed, create your first literate command:
+Now that the plugin is installed, ask the user or suggest the creation of a simple literate command (maybe a project onboarding or something similar) to flesh out your new skill.
 
-```bash
-touch .opencode/commands/my-command.md
-```
+It should have at least three steps and some simple bash script to be interesting.
 
-Add this content:
-
-```markdown
----
-description: My first literate command
-literate: true
----
-
-```yaml {config}
-step: hello
-stop: true
-```
-Hello! This is a literate command. Edit this file to create your workflow.
-```
-
-Run it:
-
-```bash
-opencode /my-command
-```
+Once done, instruct the user to reload `opencode` and attempt to run the command.
 
 ## Troubleshooting
 
