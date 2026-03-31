@@ -19,6 +19,7 @@
     "dist/",
     "literate-commands.js",
     "examples/",
+    "docs/",
     "SKILL.md"
   ],
   "keywords": [

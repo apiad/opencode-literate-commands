@@ -14,6 +14,10 @@ An OpenCode plugin that enables step-by-step command execution from markdown fil
 
 ## Installation
 
+For the old, boring way, read this:
+
+<details>
+
 ### From npm
 
 ```bash
@@ -27,6 +31,10 @@ Then add to your `opencode.json`:
   "plugins": ["opencode-literate-commands"]
 }
 ```
+
+Then copy the [`SKILL.md`](./SKILL.md) file at the root of this repo to `.opencode/skills/literate-commands/` to teach your agent how to create new literate commands.
+
+Enjoy!
 
 ### Local Development
 
@@ -45,29 +53,15 @@ cd ~/.config/opencode
 npm link opencode-literate-commands
 ```
 
-## Configuration
+</details>
 
-The plugin accepts these options in `opencode.json`:
+But the simpler way is to just run `opencode`, switch to build mode (or a suitable mode) and ask:
 
-```json
-{
-  "plugins": [
-    ["opencode-literate-commands", {
-      "commandsDir": ".opencode/commands",
-      "defaultTimeout": 30000,
-      "dockerEnabled": false,
-      "dockerImage": "python:3.11"
-    }]
-  ]
-}
+```
+Read https://apiad.github.io/opencode-literate-commands and install it.
 ```
 
-| Option | Default | Description |
-|--------|---------|-------------|
-| `commandsDir` | `.opencode/commands` | Directory containing command markdown files |
-| `defaultTimeout` | `30000` | Script execution timeout in milliseconds |
-| `dockerEnabled` | `false` | Run scripts in Docker containers |
-| `dockerImage` | `python:3.11` | Docker image when `dockerEnabled` is true |
+You agent will know what to do.
 
 ## Command Format
 

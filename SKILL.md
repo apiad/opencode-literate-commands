@@ -1,3 +1,8 @@
+---
+name: literate-commands
+description: Create guided, multi-step workflows that walk users through complex tasks with variable collection, conditional logic, and automated script execution. Extends regular opencode commands.
+---
+
 # Literate Commands Skill
 
 Use this skill when you need to create **guided, multi-step workflows** that walk users through complex tasks with variable collection, conditional logic, and automated script execution.
