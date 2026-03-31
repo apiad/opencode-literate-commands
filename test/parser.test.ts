@@ -84,8 +84,8 @@ parse:
 
         expect(result.step).toBe("ask-info")
         expect(result.parse).toBeDefined()
-        expect(result.parse.topic).toBe("What is the topic?")
-        expect(result.parse.count).toBe("What is the count?")
+        expect((result.parse as Record<string, string>).topic).toBe("What is the topic?")
+        expect((result.parse as Record<string, string>).count).toBe("What is the count?")
     })
 
     it("should handle special characters in keys", () => {
@@ -93,8 +93,8 @@ parse:
     done?: "Is it done?"
     ok: next`)
 
-        expect(result.parse["done?"]).toBe("Is it done?")
-        expect(result.parse.ok).toBe("next")
+        expect((result.parse as Record<string, string>)["done?"]).toBe("Is it done?")
+        expect((result.parse as Record<string, string>).ok).toBe("next")
     })
 })
 

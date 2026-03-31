@@ -28,12 +28,67 @@ import { readFileSync, existsSync } from "fs"
 import { join } from "path"
 import { execSync } from "child_process"
 
+// ============================================================================
+// Types
+// ============================================================================
+
+export interface CodeBlock {
+    language: string
+    meta: string[]
+    code: string
+    fullBlock: string
+}
+
+export interface Step {
+    config: StepConfig
+    prompt: string
+    codeBlocks: CodeBlock[]
+}
+
+export interface StepConfig {
+    step?: string
+    parse?: Record<string, string>
+    next?: string | Record<string, string>
+    stop?: boolean
+}
+
+export interface Metadata {
+    [key: string]: unknown
+}
+
+export interface SessionState {
+    steps: Step[]
+    currentStep: number
+    metadata: Metadata
+    sessionID: string
+    commandName: string
+    pendingParse: Record<string, string> | null
+    retries: number
+    awaitingResponse: boolean
+    awaitingRetry: boolean
+}
+
+export interface ParseResult {
+    success: boolean
+    data?: Metadata
+    error?: string
+}
+
+export interface ExecResult {
+    output: string
+    stored: Metadata | null
+}
+
+// ============================================================================
+// Constants
+// ============================================================================
+
 const COMMANDS_DIR = ".opencode/commands"
 
 // State per session
-const sessionStates = new Map()
+const sessionStates = new Map<string, SessionState>()
 
-async function log(client, msg) {
+async function log(_client: unknown, _msg: string): Promise<void> {
     // console.error("INFO [literate-commands]", msg)
 }
 
@@ -54,7 +109,7 @@ export function hasLiterateFrontmatter(content: string): boolean {
  * Parse command markdown into steps.
  * Each step is separated by --- (with optional whitespace).
  */
-export function parseLiterateMarkdown(content: string): any[] {
+export function parseLiterateMarkdown(content: string): Step[] {
     // Remove frontmatter
     let body = content
     if (body.startsWith("---")) {
@@ -66,7 +121,7 @@ export function parseLiterateMarkdown(content: string): any[] {
 
     // Split by --- separators (with optional leading/trailing whitespace)
     const sections = body.split(/\n---\n/)
-    const steps = []
+    const steps: Step[] = []
 
     for (const section of sections) {
         const trimmed = section.trim()
@@ -84,10 +139,10 @@ export function parseLiterateMarkdown(content: string): any[] {
 /**
  * Parse a single step section.
  */
-export function parseStep(section: string): any {
+export function parseStep(section: string): Step | null {
     // Extract config block (```yaml {config}...```)
     const configMatch = section.match(/```yaml\s*\{config\}\n([\s\S]*?)```/)
-    let config = { step: `step-${Date.now()}` }
+    let config: StepConfig = { step: `step-${Date.now()}` }
     let remaining = section
 
     if (configMatch) {
@@ -98,18 +153,23 @@ export function parseStep(section: string): any {
     }
 
     // Extract code blocks with their full text (including delimiters)
-    const codeBlocks = []
+    const codeBlocks: CodeBlock[] = []
     const blockRegex = /(```\w+\s*\{[^}]*\}\n[\s\S]*?```)/g
-    let lastIndex = 0
     let match
 
     while ((match = blockRegex.exec(remaining)) !== null) {
-        codeBlocks.push({
-            language: match[0].match(/^```(\w+)/)[1],
-            meta: match[0].match(/\{([^}]*)\}/)[1].split(/\s+/).filter(m => m),
-            code: match[0].match(/```\w+\s*\{[^}]*\}\n([\s\S]*?)```/)[1],
-            fullBlock: match[0]  // Preserve exact string for later replacement
-        })
+        const languageMatch = match[0].match(/^```(\w+)/)
+        const metaMatch = match[0].match(/\{([^}]*)\}/)
+        const codeMatch = match[0].match(/```\w+\s*\{[^}]*\}\n([\s\S]*?)```/)
+        
+        if (languageMatch && metaMatch && codeMatch) {
+            codeBlocks.push({
+                language: languageMatch[1],
+                meta: metaMatch[1].split(/\s+/).filter(m => m),
+                code: codeMatch[1],
+                fullBlock: match[0]
+            })
+        }
     }
 
     // Remove config block from prompt, but keep everything else including other code blocks
@@ -129,8 +189,8 @@ export function parseStep(section: string): any {
  * Simple YAML parser for nested key-value pairs.
  * Handles: key: value, nested.key: value, key: "quoted value", key: [a, b, c]
  */
-export function parseSimpleYaml(text: string): any {
-    const result = {}
+export function parseSimpleYaml(text: string): Record<string, unknown> {
+    const result: Record<string, unknown> = {}
     const lines = text.split("\n")
 
     for (const line of lines) {
@@ -145,7 +205,7 @@ export function parseSimpleYaml(text: string): any {
             // Try to parse the value
             if (value.startsWith("[") && value.endsWith("]")) {
                 // Array
-                result[key] = value.slice(1, -1).split(",").map(s => s.trim())
+                result[key] = value.slice(1, -1).split(",").map((s: string) => s.trim())
             } else if (value.startsWith('"') && value.endsWith('"')) {
                 // Double-quoted string
                 result[key] = value.slice(1, -1)
@@ -158,7 +218,7 @@ export function parseSimpleYaml(text: string): any {
                 result[key] = false
             } else if (value === "" || value === "~" || value === "null") {
                 result[key] = null
-            } else if (!isNaN(value) && value.trim() !== "") {
+            } else if (!isNaN(Number(value)) && value.trim() !== "") {
                 result[key] = Number(value)
             } else {
                 result[key] = value.trim()
@@ -173,12 +233,11 @@ export function parseSimpleYaml(text: string): any {
  * Parse nested YAML config (handles parse:, question:, match: blocks).
  * Extracts top-level keys and nested content.
  */
-export function parseNestedYaml(text: string): any {
-    const result = {}
+export function parseNestedYaml(text: string): StepConfig {
+    const result: Record<string, unknown> = {}
     const lines = text.split("\n")
-    let currentKey = null
-    let currentNested = null
-    let indentLevel = 0
+    let currentKey: string | null = null
+    let currentNested: Record<string, unknown> | null = null
 
     for (const line of lines) {
         const trimmed = line.trim()
@@ -193,8 +252,7 @@ export function parseNestedYaml(text: string): any {
             if (value === "" || value === "~") {
                 // This key has nested content
                 result[currentKey] = {}
-                currentNested = result[currentKey]
-                indentLevel = 0
+                currentNested = result[currentKey] as Record<string, unknown>
             } else {
                 // Simple value
                 result[currentKey] = parseValue(value)
@@ -205,18 +263,19 @@ export function parseNestedYaml(text: string): any {
             // Allow any characters in the key (including spaces, quotes, operators like ===)
             const nestedMatch = trimmed.match(/^(.+?)\s*:\s*(.*)$/)
             if (nestedMatch) {
-                const [nestedKey, nestedValue] = nestedMatch.slice(1)
+                const nestedKey = nestedMatch[1]
+                const nestedValue = nestedMatch[2]
                 currentNested[nestedKey] = parseValue(nestedValue)
             }
         }
     }
 
-    return result
+    return result as StepConfig
 }
 
-function parseValue(value) {
+function parseValue(value: string): unknown {
     if (value.startsWith("[") && value.endsWith("]")) {
-        return value.slice(1, -1).split(",").map(s => s.trim())
+        return value.slice(1, -1).split(",").map((s: string) => s.trim())
     } else if (value.startsWith('"') && value.endsWith('"')) {
         return value.slice(1, -1)
     } else if (value.startsWith("'") && value.endsWith("'")) {
@@ -227,7 +286,7 @@ function parseValue(value) {
         return false
     } else if (value === "" || value === "~" || value === "null") {
         return null
-    } else if (!isNaN(value) && value.trim() !== "") {
+    } else if (!isNaN(Number(value)) && value.trim() !== "") {
         return Number(value)
     }
     return value.trim()
@@ -270,7 +329,8 @@ export function getNestedValue(obj: any, path: string): any {
  * Extract text from the latest assistant message in a session.
  * Returns the combined text from all text parts of the assistant's response.
  */
-async function getLatestAssistantResponse(client, sessionID) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function getLatestAssistantResponse(client: any, sessionID: string): Promise<string | null> {
     try {
         const response = await client.session.messages({ path: { id: sessionID } })
         const messages = response.data
@@ -291,16 +351,16 @@ async function getLatestAssistantResponse(client, sessionID) {
         }
 
         // Parts are already embedded in the message - no separate API call needed
-        const texts = []
-        for (const part of latestAssistant.parts) {
-            if (part.type === "text") {
+        const texts: string[] = []
+        for (const part of latestAssistant.parts || []) {
+            if (part.type === "text" && part.text) {
                 texts.push(part.text)
             }
         }
 
         return texts.join("\n")
     } catch (e) {
-        console.error("[literate-commands] Error fetching messages:", e.message)
+        console.error("[literate-commands] Error fetching messages:", (e as Error).message)
         return null
     }
 }
@@ -350,7 +410,7 @@ export function interpolateForShell(text: string, metadata: any): string {
 // Script Execution
 // ============================================================================
 
-const INTERPRETERS = {
+const INTERPRETERS: Record<string, string> = {
     python: "python3",
     python3: "python3",
     bash: "bash",
@@ -451,8 +511,8 @@ export async function runScript(block: any, metadata: any, $: any): Promise<{ ou
             return { output: "", stored: null }
         }
     } catch (e) {
-        await log(null, `[literate-commands] Script error: ${e.message}`)
-        return { output: `Script error: ${e.message}`, stored: null }
+        await log(null, `[literate-commands] Script error: ${(e as Error).message}`)
+        return { output: `Script error: ${(e as Error).message}`, stored: null }
     }
 }
 
@@ -534,7 +594,7 @@ export function parseResponse(responseText: string, parseConfig: any): { success
     if (jsonString) {
         try {
             const parsed = JSON.parse(jsonString)
-            const result = {}
+            const result: Record<string, unknown> = {}
 
             for (const [key, type] of Object.entries(parseConfig)) {
                 if (parsed[key] !== undefined) {
@@ -554,7 +614,7 @@ export function parseResponse(responseText: string, parseConfig: any): { success
 
             return { success: true, data: result }
         } catch (e) {
-            return { success: false, error: e.message }
+            return { success: false, error: (e as Error).message }
         }
     }
 
@@ -620,7 +680,7 @@ export function evaluateCondition(condition: string, metadata: any): boolean {
 
         return fn(...values)
     } catch (e) {
-        log(null, `[literate-commands] Condition eval error: ${e.message}`)
+        log(null, `[literate-commands] Condition eval error: ${(e as Error).message}`)
         return false
     }
 }
@@ -676,7 +736,7 @@ export function resolveNextStep(next: any, steps: any[], metadata: any): number 
 
             if (key === "_") {
                 // Remember default fallback (but don't use yet)
-                defaultStep = value
+                defaultStep = value as string
                 log(null, `[literate-commands] Found default fallback: "${value}"`)
                 continue
             }
@@ -687,7 +747,7 @@ export function resolveNextStep(next: any, steps: any[], metadata: any): number 
 
             if (evalResult) {
                 conditionMatched = true
-                const index = findStepByName(steps, value)
+                const index = findStepByName(steps, value as string)
                 if (index !== -1) {
                     log(null, `[literate-commands] Condition matched! Routing to step ${index}`)
                     return index
@@ -701,7 +761,7 @@ export function resolveNextStep(next: any, steps: any[], metadata: any): number 
         // If no condition matched, use default fallback
         if (!conditionMatched && defaultStep !== null) {
             log(null, `[literate-commands] No condition matched, using default fallback: "${defaultStep}"`)
-            const index = findStepByName(steps, defaultStep)
+            const index = findStepByName(steps, defaultStep as string)
             if (index !== -1) {
                 return index
             }
@@ -716,11 +776,13 @@ export function resolveNextStep(next: any, steps: any[], metadata: any): number 
     return null
 }
 
-export default async function literateCommandsPlugin({ client, $ }) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export default async function literateCommandsPlugin({ client, $ }: { client: any; $: any }) {
     await log(client, "[literate-commands] Plugin initialized")
 
     return {
-        "command.execute.before": async (input, output) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        "command.execute.before": async (input: any, output: any) => {
             const { command, sessionID, arguments: args } = input
 
             await log(client, `[literate-commands] Intercepting /${command}`)
@@ -777,7 +839,8 @@ export default async function literateCommandsPlugin({ client, $ }) {
             };
         },
 
-        event: async ({ event }) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        event: async ({ event }: { event: any }) => {
             if (event.type !== "session.idle") return
 
             const sessionID = event.properties?.sessionID
