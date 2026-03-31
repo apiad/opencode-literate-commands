@@ -18,7 +18,8 @@
   "files": [
     "dist/",
     "literate-commands.js",
-    "examples/"
+    "examples/",
+    "SKILL.md"
   ],
   "keywords": [
     "opencode",
