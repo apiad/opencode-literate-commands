@@ -49,6 +49,7 @@ export interface SessionState {
     metadata: Metadata
     sessionID: string
     commandName: string
+    agent?: string
     pendingParse: Record<string, string> | null
     retries: number
     awaitingResponse: boolean

@@ -7,6 +7,18 @@
 import type { CodeBlock, Step, StepConfig } from "../index.js"
 
 // ============================================================================
+// Types
+// ============================================================================
+
+export interface LiterateFrontmatter {
+    agent?: string
+    description?: string
+    subagents?: string[]
+    literate?: boolean
+    [key: string]: unknown
+}
+
+// ============================================================================
 // Public Functions
 // ============================================================================
 
@@ -19,6 +31,17 @@ export function hasLiterateFrontmatter(content: string): boolean {
     const frontmatter = match[1]
     // Simple check for "literate: true" (not full YAML parsing)
     return /^\s*literate\s*:\s*true/m.test(frontmatter)
+}
+
+/**
+ * Parse the frontmatter YAML block and extract key fields like agent, description, etc.
+ */
+export function parseLiterateFrontmatter(content: string): LiterateFrontmatter {
+    const match = content.match(/^---\n([\s\S]*?)\n---/)
+    if (!match) return {}
+    
+    const frontmatterText = match[1]
+    return parseSimpleYaml(frontmatterText) as LiterateFrontmatter
 }
 
 /**

@@ -8,7 +8,7 @@ import { readFileSync, existsSync } from "fs"
 import { join } from "path"
 
 import type { SessionState } from "../index.js"
-import { hasLiterateFrontmatter, parseLiterateMarkdown } from "./parser.js"
+import { hasLiterateFrontmatter, parseLiterateMarkdown, parseLiterateFrontmatter } from "./parser.js"
 import { interpolate } from "./interpolation.js"
 import { processScripts } from "./executor.js"
 import { buildParseFormatInstruction, processParse } from "./parse.js"
@@ -97,6 +97,13 @@ export default async function literateCommandsPlugin({ client, $ }: { client: an
 
             await log(client, `[literate-commands] /${command} is literate, setting up state`)
 
+            const frontmatter = parseLiterateFrontmatter(content)
+            const agent = frontmatter.agent
+
+            if (agent) {
+                await log(client, `[literate-commands] Command specifies agent: ${agent}`)
+            }
+
             const steps = parseLiterateMarkdown(content)
             await log(client, `[literate-commands] Parsed ${steps.length} steps`)
 
@@ -111,6 +118,7 @@ export default async function literateCommandsPlugin({ client, $ }: { client: an
                 metadata: { ARGUMENTS: args || "" },
                 sessionID,
                 commandName: command,
+                agent,
                 pendingParse: null,
                 retries: 3,
                 awaitingResponse: false,
@@ -200,9 +208,11 @@ export default async function literateCommandsPlugin({ client, $ }: { client: an
                     }
 
                     await log(client, `[literate-commands] Injecting: ${finalPrompt.slice(0, 100)}...`)
+                    const body1: { parts: Array<{ type: string; text: string }>; agent?: string } = { parts: [{ type: "text", text: finalPrompt }] }
+                    if (state.agent) body1.agent = state.agent
                     await client.session.promptAsync({
                         path: { id: sessionID },
-                        body: { parts: [{ type: "text", text: finalPrompt }] }
+                        body: body1
                     })
 
                     if (!nextStep.config.parse) {
@@ -222,15 +232,19 @@ export default async function literateCommandsPlugin({ client, $ }: { client: an
 
                     if (state.retries > 0) {
                         const retryPrompt = `Could not parse your response as valid JSON. Error: ${parseResult.error}\n\nPlease respond with ONLY a JSON block containing the required keys. Format: {${Object.keys(state.pendingParse || step.config.parse || {}).join(", ")}}.`
+                        const body2: { parts: Array<{ type: string; text: string }>; agent?: string } = { parts: [{ type: "text", text: retryPrompt }] }
+                        if (state.agent) body2.agent = state.agent
                         await client.session.promptAsync({
                             path: { id: sessionID },
-                            body: { parts: [{ type: "text", text: retryPrompt }] }
+                            body: body2
                         })
                     } else {
                         const stopPrompt = `Command stopped. Parse failed after 3 retries at step ${stepIndex}.\n\nCurrent step: "${step.prompt.slice(0, 100)}..."\nVariables so far: ${JSON.stringify(state.metadata)}\n\nPlease provide instructions.`
+                        const body3: { parts: Array<{ type: string; text: string }>; agent?: string } = { parts: [{ type: "text", text: stopPrompt }] }
+                        if (state.agent) body3.agent = state.agent
                         await client.session.promptAsync({
                             path: { id: sessionID },
-                            body: { parts: [{ type: "text", text: stopPrompt }] }
+                            body: body3
                         })
                         sessionStates.delete(sessionID)
                     }
@@ -254,9 +268,11 @@ export default async function literateCommandsPlugin({ client, $ }: { client: an
 
             await log(client, `[literate-commands] Injecting: ${finalPrompt.slice(0, 100)}...`)
 
+            const body4: { parts: Array<{ type: string; text: string }>; agent?: string } = { parts: [{ type: "text", text: finalPrompt }] }
+            if (state.agent) body4.agent = state.agent
             await client.session.promptAsync({
                 path: { id: sessionID },
-                body: { parts: [{ type: "text", text: finalPrompt }] }
+                body: body4
             })
 
             if (step.config.stop === true) {

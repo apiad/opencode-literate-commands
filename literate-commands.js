@@ -5,6 +5,12 @@ function hasLiterateFrontmatter(content) {
   const frontmatter = match[1];
   return /^\s*literate\s*:\s*true/m.test(frontmatter);
 }
+function parseLiterateFrontmatter(content) {
+  const match = content.match(/^---\n([\s\S]*?)\n---/);
+  if (!match) return {};
+  const frontmatterText = match[1];
+  return parseSimpleYaml(frontmatterText);
+}
 function parseLiterateMarkdown(content) {
   let body = content;
   if (body.startsWith("---")) {
@@ -453,6 +459,11 @@ async function literateCommandsPlugin({ client, $ }) {
         return;
       }
       await log(client, `[literate-commands] /${command} is literate, setting up state`);
+      const frontmatter = parseLiterateFrontmatter(content);
+      const agent = frontmatter.agent;
+      if (agent) {
+        await log(client, `[literate-commands] Command specifies agent: ${agent}`);
+      }
       const steps = parseLiterateMarkdown(content);
       await log(client, `[literate-commands] Parsed ${steps.length} steps`);
       await log(client, `[literate-commands] Parsed ${steps.length} steps:`);
@@ -465,6 +476,7 @@ async function literateCommandsPlugin({ client, $ }) {
         metadata: { ARGUMENTS: args || "" },
         sessionID,
         commandName: command,
+        agent,
         pendingParse: null,
         retries: 3,
         awaitingResponse: false,
@@ -538,9 +550,11 @@ Please acknowledge and await.`
             await log(client, `[literate-commands] Added parse instruction, awaiting response`);
           }
           await log(client, `[literate-commands] Injecting: ${finalPrompt2.slice(0, 100)}...`);
+          const body1 = { parts: [{ type: "text", text: finalPrompt2 }] };
+          if (state.agent) body1.agent = state.agent;
           await client.session.promptAsync({
             path: { id: sessionID },
-            body: { parts: [{ type: "text", text: finalPrompt2 }] }
+            body: body1
           });
           if (!nextStep.config.parse) {
             const nextRoutedIndex = resolveNextStep(nextStep.config.next, state.steps, state.metadata);
@@ -560,9 +574,11 @@ Please acknowledge and await.`
             const retryPrompt = `Could not parse your response as valid JSON. Error: ${parseResult.error}
 
 Please respond with ONLY a JSON block containing the required keys. Format: {${Object.keys(state.pendingParse || step.config.parse || {}).join(", ")}}.`;
+            const body2 = { parts: [{ type: "text", text: retryPrompt }] };
+            if (state.agent) body2.agent = state.agent;
             await client.session.promptAsync({
               path: { id: sessionID },
-              body: { parts: [{ type: "text", text: retryPrompt }] }
+              body: body2
             });
           } else {
             const stopPrompt = `Command stopped. Parse failed after 3 retries at step ${stepIndex}.
@@ -571,9 +587,11 @@ Current step: "${step.prompt.slice(0, 100)}..."
 Variables so far: ${JSON.stringify(state.metadata)}
 
 Please provide instructions.`;
+            const body3 = { parts: [{ type: "text", text: stopPrompt }] };
+            if (state.agent) body3.agent = state.agent;
             await client.session.promptAsync({
               path: { id: sessionID },
-              body: { parts: [{ type: "text", text: stopPrompt }] }
+              body: body3
             });
             sessionStates.delete(sessionID);
           }
@@ -591,9 +609,11 @@ Please provide instructions.`;
         await log(client, `[literate-commands] Added parse instruction, awaiting response`);
       }
       await log(client, `[literate-commands] Injecting: ${finalPrompt.slice(0, 100)}...`);
+      const body4 = { parts: [{ type: "text", text: finalPrompt }] };
+      if (state.agent) body4.agent = state.agent;
       await client.session.promptAsync({
         path: { id: sessionID },
-        body: { parts: [{ type: "text", text: finalPrompt }] }
+        body: body4
       });
       if (step.config.stop === true) {
         await log(client, `[literate-commands] Stop requested, ending command`);
