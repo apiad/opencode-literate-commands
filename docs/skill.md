@@ -111,7 +111,6 @@ parse:
 2. Validate expensive operations before executing
 3. Use `mode=store` for script results that affect flow
 4. Document what each step does in comments
-```
 
 ## Save Your Skill
 
